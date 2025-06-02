@@ -5,6 +5,7 @@
 # ======================================================================
 import os
 import sys
+import json
 import flet
 
 # ----------------------------------------------------------------------
@@ -39,11 +40,34 @@ PATHINFO_TYPE_ENV      = 3
 LISTVIEW_TYPE_DIRS  = 0
 LISTVIEW_TYPE_FILES = 1
 
+FILENAME_CONFIG = "CMakeConfig.json"
+
 # ----------------------------------------------------------------------
 #	Variables
 # ----------------------------------------------------------------------
 current_solution = None
 current_window = None
+
+# ----------------------------------------------------------------------
+def to_dict(obj):
+	if isinstance(obj, dict):
+		out = {}
+		for key, val in obj.items():
+			out[key] = to_dict(val)
+		return out
+	elif isinstance(obj, list):
+		out = []
+		for val in obj:
+			out.append(to_dict(val))
+		return out
+	elif hasattr(obj, "__dict__"):
+		temp = obj.__dict__
+		out = {}
+		for key, val in temp.items():
+			out[key] = to_dict(val)
+		return out
+	else:
+		return obj
 
 # ----------------------------------------------------------------------
 class path_info:
@@ -145,6 +169,30 @@ class solution:
 		for proj in self.projects:
 			proj.change_base_path(self.path, in_path)
 		self.path = in_path
+
+	def get_savepath(self):
+		return os.path.join(self.path, FILENAME_CONFIG)
+
+	def save(self):
+		data = to_dict(self)
+		del data['path']
+		#print(data)
+		filepath = self.get_savepath()
+		with open(filepath, 'w') as outfile:
+			json.dump(data, outfile)
+		return True
+
+	def load(self, filpath):
+		with oprn(filepath, 'r') as infile:
+			data = json.load(infile)
+		self.name = data['name']
+		self.path = os.path.dirname(filepath)
+		self.projects = []
+		for sproj in data['projects']:
+			proj = project.fromjson(sproj)
+			self.projects.append(proj)
+
+
 
 # ----------------------------------------------------------------------
 ##	Make columns list of flet.DataTable
@@ -430,11 +478,27 @@ class window:
 	def get_solution_path(self):
 		return self.solution.path
 
+	def open_info_dialog(self, title, message):
+		self.dlg_info.title.value=title
+		self.dlg_info.content.value=message
+		self.page.open(self.dlg_info)
+
+	def on_close_info_dialog(self, e):
+		self.page.close(self.dlg_info)
+
 	"""Build window"""
 	def build(self, in_page):
 		self.page = in_page
 		self.page.scroll = flet.ScrollMode.AUTO
 		self.page.bgcolor = "#27282b"
+		# info dialog
+		self.dlg_info = flet.AlertDialog(
+			title=flet.Text("title"),
+			content=flet.Text("message"),
+			actions=[
+				flet.TextButton("Ok", on_click=self.on_close_info_dialog),
+			],
+		)
 		# Prepare file picker
 		self.choose_file = flet.FilePicker(on_result=self.__on_path_choosed)
 		self.page.overlay.append(self.choose_file)
@@ -444,7 +508,9 @@ class window:
 			self.solution.name = e.control.value
 		row = flet.Row(
 			[
-				flet.TextField(label="Solution name", on_change=on_change_solution_name, value=self.solution.name, border_color="#808080")
+				flet.TextField(label="Solution name", on_change=on_change_solution_name, value=self.solution.name, border_color="#808080"),
+				flet.FilledButton("Save", on_click=self.on_press_save_solution),
+				flet.FilledButton("Load", on_click=self.on_press_load_solution)
 			]
 		)
 		self.page.add( row )
@@ -466,6 +532,18 @@ class window:
 		tab = flet.Tab(text="+NewProject")
 		self.tab_projects.tabs.append(tab)
 		self.page.add(self.tab_projects)
+
+	def on_press_save_solution(self, e):
+		if self.solution.path is None:
+			self.open_info_dialog("Error", 'Solution path must be not empty')
+		if not os.path.isdir(self.solution.path):
+			self.open_info_dialog("Error", 'Solution path is incorrect')
+		if not self.solution.save():
+			self.open_info_dialog("Error", 'Failed to save solution')
+
+
+	def on_press_load_solution(self, e):
+		pass
 
 # ----------------------------------------------------------------------
 def main(page: flet.Page):
