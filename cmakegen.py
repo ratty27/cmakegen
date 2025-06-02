@@ -16,6 +16,13 @@ SUPPORT_PLATFORMS = [
 	"Linux",
 ]
 
+EXTENSIONS_CPP=[
+	"c",
+	"cc",
+	"cpp",
+	"cxx",
+]
+
 CXXSTANDARD= [
 	"default",
 	"C++11",
@@ -28,6 +35,9 @@ PATHINFO_TYPE_NONE     = 0
 PATHINFO_TYPE_ABSOLUTE = 1
 PATHINFO_TYPE_RELATIVE = 2
 PATHINFO_TYPE_ENV      = 3
+
+LISTVIEW_TYPE_DIRS  = 0
+LISTVIEW_TYPE_FILES = 1
 
 # ----------------------------------------------------------------------
 #	Variables
@@ -48,7 +58,7 @@ class path_info:
 			self.type = PATHINFO_TYPE_NONE
 			self.base_path = None
 			self.path = None
-			self.platform = []
+		self.platform = []
 
 	def change_base_path(self, new_path):
 		if self.type == PATHINFO_TYPE_RELATIVE:
@@ -62,6 +72,13 @@ class path_info:
 				self.type = PATHINFO_TYPE_RELATIVE
 				self.base_path = new_path
 				self.path = os.path.relpath(self.path, new_path)
+
+	def set_platform(self, platname, enable):
+		if enable:
+			if platname not in self.platform:
+				self.platform.append(platname)
+		else:
+			self.platform.removed(platname)
 
 # ----------------------------------------------------------------------
 class project:
@@ -167,7 +184,8 @@ def add_data_table(dt, columns, idx, on_checked):
 ##	ListView of pathes
 class listview_path:
 	"""Constructor"""
-	def __init__(self, in_owner, proj, in_list_path):
+	def __init__(self, in_type, in_owner, proj, in_list_path):
+		self.type = in_type
 		self.project = proj
 		self.owner = in_owner
 		self.dt = None
@@ -177,8 +195,9 @@ class listview_path:
 		parent.controls.append(flet.Text(title, weight=flet.FontWeight.BOLD))
 		names = []
 		names.append("Path")
-		for platname in self.project.platform:
-			names.append(platname)
+		for platname in SUPPORT_PLATFORMS:
+			if platname in self.project.platform:
+				names.append(platname)
 		self.dt = make_data_table(names, True)
 		self.update_list(False)
 		box = flet.Container(content=self.dt)
@@ -193,21 +212,25 @@ class listview_path:
 	def update_list(self, update_immediately=True):
 		names = []
 		names.append("Path")
-		for platname in self.project.platform:
-			names.append(platname)
+		for platname in SUPPORT_PLATFORMS:
+			if platname in self.project.platform:
+				names.append(platname)
 		self.dt.columns = make_data_table_columuns(names) 
 		self.dt.rows.clear()
 		idx = 0
 		for item in self.list_path:
 			text = flet.Text(item.path)
 			clmns = [text]
-			for platname in self.project.platform:
-				if platname in item.platform:
-					init = True
-				else:
-					init = False
-				chk = flet.Checkbox(value=init)
-				clmns.append(chk)
+			for platname in SUPPORT_PLATFORMS:
+				if platname in self.project.platform:
+					if platname in item.platform:
+						init = True
+					else:
+						init = False
+					chk = flet.Checkbox(value=init, on_change=self.on_platform_choosed)
+					chk.platform = platname
+					chk.idx = idx
+					clmns.append(chk)
 			add_data_table(self.dt, clmns, idx, self.on_selection_changed)
 			idx += 1
 		if update_immediately:
@@ -218,7 +241,10 @@ class listview_path:
 		init_path = self.owner.get_solution_path()
 		if init_path is None:
 			init_path = self.owner.get_init_path()
-		self.owner.choose_a_dir("Choose path", init_path, self.on_path_selected)
+		if self.type == LISTVIEW_TYPE_DIRS:
+			self.owner.choose_a_dir("Choose path", init_path, self.on_path_selected)
+		elif self.type == LISTVIEW_TYPE_FILES:
+			self.owner.choose_a_file("Choose file", init_path, self.on_path_selected)
 
 	def on_path_selected(self, path):
 		base_path = self.owner.get_solution_path()
@@ -242,6 +268,11 @@ class listview_path:
 				del self.list_path[idx]
 		self.update_list(True)
 
+	def on_platform_choosed(self, e):
+		idx = e.control.idx
+		platname = e.control.platform
+		if idx < len(self.list_path):
+			self.list_path[idx].set_platform(platname, e.data)
 
 # ----------------------------------------------------------------------
 ##	Project tab
@@ -260,6 +291,8 @@ class project_tab:
 	def on_change_plaform(self, e):
 		self.project.enable_platform(e.control.label, e.control.value)
 		self.lv_include_dirs.update_list(True)
+		self.lv_library_dirs.update_list(True)
+		self.lv_source_files.update_list(True)
 
 	"""On change c++ stadard"""
 	def on_change_cpp_standard(self, e):
@@ -267,6 +300,9 @@ class project_tab:
 
 	def on_basepath_changed(self):
 		self.lv_include_dirs.update_list(False)
+		self.lv_library_dirs.update_list(False)
+		self.lv_source_files.update_list(True)
+
 
 	def build(self):
 		# Name
@@ -306,8 +342,14 @@ class project_tab:
 		dd.value = self.project.stdcpp
 		content.controls.append(dd)
 		# - include directories
-		self.lv_include_dirs = listview_path(self.owner, self.project, self.project.include_dirs)
+		self.lv_include_dirs = listview_path(LISTVIEW_TYPE_DIRS, self.owner, self.project, self.project.include_dirs)
 		self.lv_include_dirs.build(content, "Include directories")
+		# - library directories
+		self.lv_library_dirs = listview_path(LISTVIEW_TYPE_DIRS, self.owner, self.project, self.project.library_dirs)
+		self.lv_library_dirs.build(content, "Library directories")
+		# - Sounrce Files
+		self.lv_source_files = listview_path(LISTVIEW_TYPE_FILES, self.owner, self.project, self.project.sources)
+		self.lv_source_files.build(content, "Sounrce Files")
 		# - Panel
 		title = flet.Text(" C/C++", weight=flet.FontWeight.BOLD, size=32)
 		panel_cpp = flet.ExpansionPanel(header=title, can_tap_header=True, expanded=True, bgcolor="#4a4f62")
@@ -350,7 +392,12 @@ class window:
 	"""Result of choose path"""
 	def __on_path_choosed(self, e):
 		if self.cb_choose_path is not None:
-			self.cb_choose_path(e.path)
+			print(e)
+			if e.path is not None:
+				self.cb_choose_path(e.path)
+			elif e.files is not None:
+				for fileinfo in e.files:
+					self.cb_choose_path(fileinfo.path)
 			self.cb_choose_path = None
 			return
 		self.solution.set_path( e.path )
@@ -375,6 +422,10 @@ class window:
 	def choose_a_dir(self, title, initial_path, cb):
 		self.cb_choose_path = cb
 		self.choose_file.get_directory_path(dialog_title=title, initial_directory=initial_path)
+
+	def choose_a_file(self, title, initial_path, cb):
+		self.cb_choose_path = cb
+		self.choose_file.pick_files(dialog_title=title, initial_directory=initial_path, file_type=flet.FilePickerFileType.CUSTOM, allowed_extensions=EXTENSIONS_CPP, allow_multiple=False)
 
 	def get_solution_path(self):
 		return self.solution.path
