@@ -218,6 +218,67 @@ class solution:
 			proj = project.fromdict(sproj)
 			self.projects.append(proj)
 
+	def generate_cmake(self):
+		"""Generate CMakeLists.txt file"""
+		if not self.path or not os.path.isdir(self.path):
+			return False, "Solution path is not set or invalid"
+		
+		cmake_content = []
+		cmake_content.append(f"cmake_minimum_required(VERSION 3.10)")
+		cmake_content.append(f"project({self.name})")
+		cmake_content.append("")
+		
+		# Set C++ standard
+		for proj in self.projects:
+			if proj.stdcpp != "default":
+				std_version = proj.stdcpp.replace("C++", "")
+				cmake_content.append(f"set(CMAKE_CXX_STANDARD {std_version})")
+				cmake_content.append(f"set(CMAKE_CXX_STANDARD_REQUIRED ON)")
+				break
+		
+		cmake_content.append("")
+		
+		# Generate for each project
+		for proj in self.projects:
+			cmake_content.append(f"# Project: {proj.name}")
+			
+			# Add executable
+			cmake_content.append(f"add_executable({proj.name}")
+			
+			# Add source files
+			for source in proj.sources:
+				if source.path:
+					cmake_content.append(f"    {source.path}")
+			cmake_content.append(")")
+			cmake_content.append("")
+			
+			# Add include directories
+			if proj.include_dirs:
+				cmake_content.append(f"target_include_directories({proj.name} PRIVATE")
+				for include_dir in proj.include_dirs:
+					if include_dir.path:
+						cmake_content.append(f"    {include_dir.path}")
+				cmake_content.append(")")
+				cmake_content.append("")
+			
+			# Add library directories
+			if proj.library_dirs:
+				cmake_content.append(f"target_link_directories({proj.name} PRIVATE")
+				for lib_dir in proj.library_dirs:
+					if lib_dir.path:
+						cmake_content.append(f"    {lib_dir.path}")
+				cmake_content.append(")")
+				cmake_content.append("")
+		
+		# Write CMakeLists.txt
+		cmake_file = os.path.join(self.path, "CMakeLists.txt")
+		try:
+			with open(cmake_file, 'w', encoding='utf-8') as f:
+				f.write('\n'.join(cmake_content))
+			return True, f"CMakeLists.txt generated successfully at {cmake_file}"
+		except Exception as e:
+			return False, f"Failed to generate CMakeLists.txt: {str(e)}"
+
 
 
 # ----------------------------------------------------------------------
@@ -535,7 +596,8 @@ class window:
 			[
 				flet.TextField(label="Solution name", on_change=on_change_solution_name, value=self.solution.name, border_color="#808080"),
 				flet.FilledButton("Save", on_click=self.on_press_save_solution),
-				flet.FilledButton("Load", on_click=self.on_press_load_solution)
+				flet.FilledButton("Load", on_click=self.on_press_load_solution),
+				flet.FilledButton("Generate", on_click=self.on_press_generate_cmake, color="#4CAF50")
 			]
 		)
 		self.page.add( row )
@@ -569,6 +631,14 @@ class window:
 	def on_press_load_solution(self, e):
 		pass
 		#self.solution.load(s)
+
+	def on_press_generate_cmake(self, e):
+		"""Generate CMakeLists.txt when Generate button is clicked"""
+		success, message = self.solution.generate_cmake()
+		if success:
+			self.open_info_dialog("Success", message)
+		else:
+			self.open_info_dialog("Error", message)
 
 # ----------------------------------------------------------------------
 def main(page: flet.Page):
