@@ -43,6 +43,26 @@ LISTVIEW_TYPE_FILES = 1
 FILENAME_CONFIG = "CMakeConfig.json"
 
 # ----------------------------------------------------------------------
+#	Modern UI Constants
+# ----------------------------------------------------------------------
+COLORS = {
+	"primary": "#6366f1",
+	"primary_dark": "#4f46e5",
+	"secondary": "#8b5cf6",
+	"accent": "#06b6d4",
+	"success": "#10b981",
+	"warning": "#f59e0b",
+	"error": "#ef4444",
+	"background": "#0f172a",
+	"surface": "#1e293b",
+	"surface_light": "#334155",
+	"text_primary": "#f8fafc",
+	"text_secondary": "#cbd5e1",
+	"border": "#475569",
+	"border_light": "#64748b"
+}
+
+# ----------------------------------------------------------------------
 #	Variables
 # ----------------------------------------------------------------------
 current_solution = None
@@ -102,7 +122,8 @@ class path_info:
 			if platname not in self.platform:
 				self.platform.append(platname)
 		else:
-			self.platform.removed(platname)
+			if platname in self.platform:
+				self.platform.remove(platname)
 
 	@staticmethod
 	def fromdict(s):
@@ -123,11 +144,11 @@ class path_info:
 class project:
 	"""Constructor"""
 	def __init__(self):
-		self.name = None
+		self.name = "Project1"  # Set default name
 		self.include_dirs = []	# Array of path_info
 		self.library_dirs = []
 		self.sources = []
-		self.platform = []
+		self.platform = ["Windows"]  # Default to Windows platform
 		self.stdcpp = CXXSTANDARD[0]
 
 	def enable_platform(self, name, enable):
@@ -152,7 +173,8 @@ class project:
 
 	def del_plaform(self, name, pathlist):
 		for info in pathlist:
-			info.platform.remove(name)
+			if name in info.platform:
+				info.platform.remove(name)
 
 	def change_base_path(self, old_path, new_path):
 		self._change_base_path(self.include_dirs, old_path, new_path)
@@ -189,6 +211,7 @@ class solution:
 		proj = project()
 		proj.name = "Project" + str(len(self.projects)+1)
 		self.add_project(proj)
+		print(f"Created project: {proj.name} with platforms: {proj.platform}")
 		return proj
 
 	def set_path(self, in_path):
@@ -288,7 +311,7 @@ def make_data_table_columuns(column_name):
 	columns = []
 	for name in column_name:
 		if isinstance(name, str):
-			ctrl = flet.DataColumn(flet.Text(name))
+			ctrl = flet.DataColumn(flet.Text(name, color=COLORS["text_primary"], weight=flet.FontWeight.W_600))
 		else:
 			ctrl = name
 		columns.append( ctrl )
@@ -299,7 +322,17 @@ def make_data_table_columuns(column_name):
 #	@param	column_name		Array of column name
 def make_data_table(column_name,checkbox=False):
 	columns = make_data_table_columuns(column_name)
-	dt = flet.DataTable(columns=columns, show_checkbox_column=checkbox)
+	dt = flet.DataTable(
+		columns=columns, 
+		show_checkbox_column=checkbox,
+		border=flet.border.all(1, COLORS["border"]),
+		border_radius=8,
+		heading_row_color=COLORS["surface_light"],
+		heading_text_style=flet.TextStyle(color=COLORS["text_primary"], weight=flet.FontWeight.W_600),
+		data_row_color={"hovered": COLORS["surface_light"]},
+		divider_thickness=1,
+		column_spacing=20
+	)
 	return dt
 
 # ----------------------------------------------------------------------
@@ -327,7 +360,17 @@ class listview_path:
 		self.list_path = in_list_path	# ! Direct referefence to the path list
 
 	def build(self, parent, title):
-		parent.controls.append(flet.Text(title, weight=flet.FontWeight.BOLD))
+		# Title with icon
+		title_row = flet.Row([
+			flet.Icon(
+				name="folder" if self.type == LISTVIEW_TYPE_DIRS else "description",
+				color=COLORS["accent"],
+				size=24
+			),
+			flet.Text(title, weight=flet.FontWeight.BOLD, size=18, color=COLORS["text_primary"])
+		], spacing=12)
+		parent.controls.append(title_row)
+		
 		names = []
 		names.append("Path")
 		for platname in SUPPORT_PLATFORMS:
@@ -335,14 +378,51 @@ class listview_path:
 				names.append(platname)
 		self.dt = make_data_table(names, True)
 		self.update_list(False)
-		box = flet.Container(content=self.dt)
-		box.border = flet.border.all(2, "#303030")
-		parent.controls.append(box)
-		# buttons
-		addbtn = flet.FilledButton("Add", on_click=self.on_press_add_path)
-		delbtn = flet.FilledButton("Delete Checked", on_click=self.on_press_del_path)
-		box = flet.Row(spacing=8, controls=[addbtn, delbtn])
-		parent.controls.append(box)
+		
+		# Card container for table
+		table_card = flet.Container(
+			content=self.dt,
+			padding=16,
+			bgcolor=COLORS["surface"],
+			border_radius=12,
+			border=flet.border.all(1, COLORS["border"]),
+			shadow=flet.BoxShadow(
+				spread_radius=1,
+				blur_radius=15,
+				color=COLORS["background"],
+				offset=flet.Offset(0, 4)
+			)
+		)
+		parent.controls.append(table_card)
+		
+		# Modern buttons
+		addbtn = flet.ElevatedButton(
+			"Add",
+			icon=flet.Icon("add", color=COLORS["success"]),
+			on_click=self.on_press_add_path,
+			bgcolor=COLORS["success"],
+			color=COLORS["text_primary"],
+			style=flet.ButtonStyle(
+				shape=flet.RoundedRectangleBorder(radius=8),
+				padding=12
+			)
+		)
+		delbtn = flet.ElevatedButton(
+			"Delete Checked",
+			icon=flet.Icon("delete", color=COLORS["error"]),
+			on_click=self.on_press_del_path,
+			bgcolor=COLORS["error"],
+			color=COLORS["text_primary"],
+			style=flet.ButtonStyle(
+				shape=flet.RoundedRectangleBorder(radius=8),
+				padding=12
+			)
+		)
+		button_row = flet.Row(spacing=12, controls=[addbtn, delbtn])
+		parent.controls.append(button_row)
+		
+		# Add spacing
+		parent.controls.append(flet.Container(height=20))
 
 	def update_list(self, update_immediately=True):
 		names = []
@@ -354,7 +434,7 @@ class listview_path:
 		self.dt.rows.clear()
 		idx = 0
 		for item in self.list_path:
-			text = flet.Text(item.path)
+			text = flet.Text(item.path, color=COLORS["text_secondary"])
 			clmns = [text]
 			for platname in SUPPORT_PLATFORMS:
 				if platname in self.project.platform:
@@ -362,7 +442,12 @@ class listview_path:
 						init = True
 					else:
 						init = False
-					chk = flet.Checkbox(value=init, on_change=self.on_platform_choosed)
+					chk = flet.Checkbox(
+						value=init, 
+						on_change=self.on_platform_choosed,
+						fill_color=COLORS["primary"],
+						check_color=COLORS["text_primary"]
+					)
 					chk.platform = platname
 					chk.idx = idx
 					clmns.append(chk)
@@ -370,7 +455,6 @@ class listview_path:
 			idx += 1
 		if update_immediately:
 			self.dt.update()
-			#self.owner.page.update()
 
 	def on_press_add_path(self, e):
 		init_path = self.owner.get_solution_path()
@@ -438,18 +522,54 @@ class project_tab:
 		self.lv_library_dirs.update_list(False)
 		self.lv_source_files.update_list(True)
 
-
 	def build(self):
-		# Name
-		content = flet.TextField(label="Project name", on_change=self.on_change_project_name, value=self.project.name, border_color="#808080")
-		# - Panel
-		title = flet.Text(" Project", weight=flet.FontWeight.BOLD, size=32)
-		panel_project = flet.ExpansionPanel(header=title, can_tap_header=True, expanded=True, bgcolor="#4a4f62")
-		panel_project.content = content
+		print(f"Building project tab content for: {self.project.name}")
+		
+		# Ensure project has valid data
+		if self.project.name is None:
+			self.project.name = "Project1"
+		if not self.project.platform:
+			self.project.platform = ["Windows"]
+		if self.project.stdcpp is None:
+			self.project.stdcpp = CXXSTANDARD[0]
+		
+		print(f"   - Project initialized: {self.project.name}")
+		print(f"   - Platforms: {self.project.platform}")
+		print(f"   - C++ standard: {self.project.stdcpp}")
+		
+		# Project Name Panel
+		name_content = flet.TextField(
+			label="Project name", 
+			on_change=self.on_change_project_name, 
+			value=self.project.name, 
+			border_color=COLORS["border"],
+			focused_border_color=COLORS["primary"],
+			label_style=flet.TextStyle(color=COLORS["text_secondary"]),
+			text_style=flet.TextStyle(color=COLORS["text_primary"]),
+			bgcolor=COLORS["surface_light"],
+			border_radius=8
+		)
+		
+		title = flet.Row([
+			flet.Icon("build", color=COLORS["primary"], size=28),
+			flet.Text(" Project", weight=flet.FontWeight.BOLD, size=24, color=COLORS["text_primary"])
+		], spacing=12)
+		
+		panel_project = flet.ExpansionPanel(
+			header=title, 
+			can_tap_header=True, 
+			expanded=True, 
+			bgcolor=COLORS["surface"],
+			content=flet.Container(
+				content=name_content,
+				padding=20,
+				bgcolor=COLORS["surface_light"],
+				border_radius=8
+			)
+		)
 
-		# Platform
-		content = flet.Row()
-		# - Plateform checkbox
+		# Platform Panel
+		platform_content = flet.Row(spacing=16)
 		self.chk_platform = []
 		idx = 0
 		while idx < len(SUPPORT_PLATFORMS):
@@ -457,42 +577,108 @@ class project_tab:
 				support = True
 			else:
 				support = False
-			chk = flet.Checkbox(label=SUPPORT_PLATFORMS[idx], value=support, on_change=self.on_change_plaform)
+			chk = flet.Checkbox(
+				label=SUPPORT_PLATFORMS[idx], 
+				value=support, 
+				on_change=self.on_change_plaform,
+				fill_color=COLORS["primary"],
+				check_color=COLORS["text_primary"],
+				label_style=flet.TextStyle(color=COLORS["text_primary"])
+			)
 			self.chk_platform.append(chk)
-			content.controls.append(chk)
+			platform_content.controls.append(chk)
 			idx += 1
-		# - Panel
-		title = flet.Text(" Platform", weight=flet.FontWeight.BOLD, size=32)
-		panel_platform = flet.ExpansionPanel(header=title, can_tap_header=True, expanded=True, bgcolor="#4a4f62")
-		panel_platform.content = content
+		
+		platform_title = flet.Row([
+			flet.Icon("computer", color=COLORS["secondary"], size=28),
+			flet.Text(" Platform", weight=flet.FontWeight.BOLD, size=24, color=COLORS["text_primary"])
+		], spacing=12)
+		
+		panel_platform = flet.ExpansionPanel(
+			header=platform_title, 
+			can_tap_header=True, 
+			expanded=True, 
+			bgcolor=COLORS["surface"],
+			content=flet.Container(
+				content=platform_content,
+				padding=20,
+				bgcolor=COLORS["surface_light"],
+				border_radius=8
+			)
+		)
 
-		# C/C++
-		content = flet.Column()
-		# - C++ standard
-		content.controls.append(flet.Text("C++ standard", weight=flet.FontWeight.BOLD))
+		# C/C++ Panel
+		cpp_content = flet.Column(spacing=16)
+		
+		# C++ standard
+		cpp_content.controls.append(flet.Text("C++ standard", weight=flet.FontWeight.BOLD, color=COLORS["text_primary"]))
 		opt = []
 		for item in CXXSTANDARD:
 			opt.append(flet.dropdown.Option(item))
-		dd = flet.Dropdown(options=opt, on_change=self.on_change_cpp_standard)
+		dd = flet.Dropdown(
+			options=opt, 
+			on_change=self.on_change_cpp_standard,
+			border_color=COLORS["border"],
+			focused_border_color=COLORS["primary"],
+			bgcolor=COLORS["surface_light"],
+			color=COLORS["text_primary"]
+		)
 		dd.value = self.project.stdcpp
-		content.controls.append(dd)
-		# - include directories
+		cpp_content.controls.append(dd)
+		
+		# Add spacing after dropdown
+		cpp_content.controls.append(flet.Container(height=16))
+		
+		# include directories
 		self.lv_include_dirs = listview_path(LISTVIEW_TYPE_DIRS, self.owner, self.project, self.project.include_dirs)
-		self.lv_include_dirs.build(content, "Include directories")
-		# - library directories
+		self.lv_include_dirs.build(cpp_content, "Include directories")
+		
+		# library directories
 		self.lv_library_dirs = listview_path(LISTVIEW_TYPE_DIRS, self.owner, self.project, self.project.library_dirs)
-		self.lv_library_dirs.build(content, "Library directories")
-		# - Sounrce Files
+		self.lv_library_dirs.build(cpp_content, "Library directories")
+		
+		# Source Files
 		self.lv_source_files = listview_path(LISTVIEW_TYPE_FILES, self.owner, self.project, self.project.sources)
-		self.lv_source_files.build(content, "Sounrce Files")
-		# - Panel
-		title = flet.Text(" C/C++", weight=flet.FontWeight.BOLD, size=32)
-		panel_cpp = flet.ExpansionPanel(header=title, can_tap_header=True, expanded=True, bgcolor="#4a4f62")
-		panel_cpp.content = content
+		self.lv_source_files.build(cpp_content, "Source Files")
+		
+		cpp_title = flet.Row([
+			flet.Icon("code", color=COLORS["accent"], size=28),
+			flet.Text(" C/C++", weight=flet.FontWeight.BOLD, size=24, color=COLORS["text_primary"])
+		], spacing=12)
+		
+		panel_cpp = flet.ExpansionPanel(
+			header=cpp_title, 
+			can_tap_header=True, 
+			expanded=True, 
+			bgcolor=COLORS["surface"],
+			content=flet.Container(
+				content=cpp_content,
+				padding=20,
+				bgcolor=COLORS["surface_light"],
+				border_radius=8
+			)
+		)
 
-		#
-		self.content = flet.ExpansionPanelList(controls=[panel_project, panel_platform, panel_cpp])
-		#
+		# Create expansion panel list with modern styling
+		print(f"Creating ExpansionPanelList with {len([panel_project, panel_platform, panel_cpp])} panels")
+		self.content = flet.ExpansionPanelList(
+			controls=[panel_project, panel_platform, panel_cpp],
+			spacing=16,
+			elevation=8,
+			expand_icon_color=COLORS["primary"]
+		)
+		print(f"ExpansionPanelList created: {self.content}")
+		
+		# Debug: Print the content structure
+		print(f"✅ Project tab content built successfully for {self.project.name}")
+		print(f"   - Project name: {self.project.name}")
+		print(f"   - Platforms: {self.project.platform}")
+		print(f"   - C++ standard: {self.project.stdcpp}")
+		print(f"   - Include dirs count: {len(self.project.include_dirs)}")
+		print(f"   - Library dirs count: {len(self.project.library_dirs)}")
+		print(f"   - Sources count: {len(self.project.sources)}")
+		print(f"   - Content type: {type(self.content)}")
+		print(f"   - Content controls count: {len(self.content.controls)}")
 
 		return self.content
 
@@ -515,13 +701,34 @@ class window:
 			projtab, tab = self.__build_project_tab(proj)
 			self.tab_projects.tabs.insert(len(self.tab_projects.tabs)-1, tab)
 			self.content_projects.append(projtab)
+			
+			# Set the newly created tab as selected
+			self.tab_projects.selected_index = len(self.tab_projects.tabs) - 2
+			
+			# Force update of the entire page to ensure UI consistency
 			self.page.update()
+			# Also update the tabs container specifically
+			if hasattr(self, 'tabs_card'):
+				self.tabs_card.update()
 
 	"""Build a project tab"""
 	def __build_project_tab(self, proj):
+		print(f"Building project tab for: {proj.name}")
 		projtab = project_tab(self, proj)
 		content = projtab.build()
-		tab = flet.Tab(text=proj.name, content=content)
+		print(f"Content built successfully for {proj.name}")
+		print(f"   - Content type: {type(content)}")
+		print(f"   - Content has controls: {hasattr(content, 'controls')}")
+		if hasattr(content, 'controls'):
+			print(f"   - Content controls count: {len(content.controls)}")
+		
+		tab = flet.Tab(
+			text=proj.name, 
+			content=content,
+			icon=flet.Icon("folder", color=COLORS["accent"])
+		)
+		print(f"Tab created for {proj.name}: {tab}")
+		print(f"   - Tab content: {tab.content}")
 		return projtab, tab
 
 	"""Result of choose path"""
@@ -545,7 +752,6 @@ class window:
 			return os.path.expanduser("~")
 		else:
 			return self.solution.path
-
 
 	"""Choose path"""
 	def on_press_choose_path(self, e):
@@ -575,50 +781,230 @@ class window:
 	"""Build window"""
 	def build(self, in_page):
 		self.page = in_page
-		self.page.scroll = flet.ScrollMode.AUTO
-		self.page.bgcolor = "#27282b"
+		self.page.scroll = flet.ScrollMode.ALWAYS
+		self.page.bgcolor = COLORS["background"]
+		self.page.padding = 24
+		self.page.spacing = 20
+		
+		# Header with gradient background
+		header = flet.Container(
+			content=flet.Column([
+				flet.Row([
+					flet.Icon("construction", color=COLORS["primary"], size=32),
+					flet.Text("CMake Generator", size=32, weight=flet.FontWeight.BOLD, color=COLORS["text_primary"])
+				], spacing=16),
+				flet.Text("Professional CMake project configuration tool", size=16, color=COLORS["text_secondary"])
+			]),
+			padding=24,
+			bgcolor=COLORS["surface"],
+			border_radius=16,
+			border=flet.border.all(1, COLORS["border"]),
+			shadow=flet.BoxShadow(
+				spread_radius=1,
+				blur_radius=20,
+				color=COLORS["background"],
+				offset=flet.Offset(0, 8)
+			)
+		)
+		self.page.add(header)
+		
 		# info dialog
 		self.dlg_info = flet.AlertDialog(
-			title=flet.Text("title"),
-			content=flet.Text("message"),
+			title=flet.Text("title", color=COLORS["text_primary"]),
+			content=flet.Text("message", color=COLORS["text_secondary"]),
+			bgcolor=COLORS["surface"],
 			actions=[
-				flet.TextButton("Ok", on_click=self.on_close_info_dialog),
+				flet.TextButton("Ok", on_click=self.on_close_info_dialog, style=flet.ButtonStyle(color=COLORS["primary"])),
 			],
 		)
+		
 		# Prepare file picker
 		self.choose_file = flet.FilePicker(on_result=self.__on_path_choosed)
 		self.page.overlay.append(self.choose_file)
-		# Solution
-		# - Name
-		def on_change_solution_name(e):
-			self.solution.name = e.control.value
-		row = flet.Row(
-			[
-				flet.TextField(label="Solution name", on_change=on_change_solution_name, value=self.solution.name, border_color="#808080"),
-				flet.FilledButton("Save", on_click=self.on_press_save_solution),
-				flet.FilledButton("Load", on_click=self.on_press_load_solution),
-				flet.FilledButton("Generate", on_click=self.on_press_generate_cmake, color="#4CAF50")
-			]
+		
+		# Solution Configuration Card
+		solution_card = flet.Container(
+			content=flet.Column([
+				# Solution Name Row
+				flet.Row([
+					flet.TextField(
+						label="Solution name", 
+						on_change=lambda e: setattr(self.solution, 'name', e.control.value), 
+						value=self.solution.name, 
+						border_color=COLORS["border"],
+						focused_border_color=COLORS["primary"],
+						label_style=flet.TextStyle(color=COLORS["text_secondary"]),
+						text_style=flet.TextStyle(color=COLORS["text_primary"]),
+						bgcolor=COLORS["surface_light"],
+						border_radius=8,
+						expand=True
+					),
+					flet.ElevatedButton(
+						"Save",
+						icon=flet.Icon("save", color=COLORS["text_primary"]),
+						on_click=self.on_press_save_solution,
+						bgcolor=COLORS["primary"],
+						color=COLORS["text_primary"],
+						style=flet.ButtonStyle(shape=flet.RoundedRectangleBorder(radius=8), padding=12)
+					),
+					flet.ElevatedButton(
+						"Load",
+						icon=flet.Icon("folder_open", color=COLORS["text_primary"]),
+						on_click=self.on_press_load_solution,
+						bgcolor=COLORS["secondary"],
+						color=COLORS["text_primary"],
+						style=flet.ButtonStyle(shape=flet.RoundedRectangleBorder(radius=8), padding=12)
+					),
+					flet.ElevatedButton(
+						"Generate",
+						icon=flet.Icon("play_arrow", color=COLORS["text_primary"]),
+						on_click=self.on_press_generate_cmake,
+						bgcolor=COLORS["success"],
+						color=COLORS["text_primary"],
+						style=flet.ButtonStyle(shape=flet.RoundedRectangleBorder(radius=8), padding=12)
+					)
+				], spacing=12),
+				
+				# Solution Path Row
+				flet.Row([
+					flet.TextField(
+						label="Path", 
+						width=600, 
+						on_change=lambda e: setattr(self.solution, 'path', e.control.value), 
+						value=self.solution.path, 
+						border_color=COLORS["border"],
+						focused_border_color=COLORS["primary"],
+						label_style=flet.TextStyle(color=COLORS["text_secondary"]),
+						text_style=flet.TextStyle(color=COLORS["text_primary"]),
+						bgcolor=COLORS["surface_light"],
+						border_radius=8
+					),
+					flet.ElevatedButton(
+						"...",
+						on_click=self.on_press_choose_path,
+						bgcolor=COLORS["surface_light"],
+						color=COLORS["text_primary"],
+						style=flet.ButtonStyle(shape=flet.RoundedRectangleBorder(radius=8), padding=12)
+					)
+				], spacing=12)
+			], spacing=16),
+			padding=24,
+			bgcolor=COLORS["surface"],
+			border_radius=16,
+			border=flet.border.all(1, COLORS["border"]),
+			shadow=flet.BoxShadow(
+				spread_radius=1,
+				blur_radius=15,
+				color=COLORS["background"],
+				offset=flet.Offset(0, 4)
+			)
 		)
-		self.page.add( row )
-		# - Path
-		self.ctrl_solution_path = flet.TextField(label="Path", width=600, on_change=on_change_solution_name, value=self.solution.name, border_color="#808080")
-		row = flet.Row(
-			[
-				self.ctrl_solution_path,
-				flet.FilledButton("...", on_click=self.on_press_choose_path)
-			]
+		self.page.add(solution_card)
+		
+		# Projects Section
+		projects_header = flet.Container(
+			content=flet.Row([
+				flet.Icon("apps", color=COLORS["accent"], size=28),
+				flet.Text("Projects", size=24, weight=flet.FontWeight.BOLD, color=COLORS["text_primary"])
+			], spacing=12),
+			padding=16,
+			bgcolor=COLORS["surface"],
+			border_radius=12,
+			border=flet.border.all(1, COLORS["border"])
 		)
-		self.page.add( row )
-		# Projects
-		self.tab_projects = flet.Tabs(on_click=self.__on_click_tab)
-		for proj in self.solution.projects:
-			projtab, tab = self.__build_project_tab(proj)
+		self.page.add(projects_header)
+		
+		# Projects Tabs
+		self.tab_projects = flet.Tabs(
+			on_click=self.__on_click_tab,
+			selected_index=0,
+			animation_duration=300,
+			indicator_color=COLORS["primary"],
+			label_color=COLORS["text_primary"],
+			unselected_label_color=COLORS["text_secondary"],
+			visible=True,
+			height=600
+		)
+		
+		# Add default project if none exists
+		if len(self.solution.projects) == 0:
+			default_proj = self.solution.new_project()
+			projtab, tab = self.__build_project_tab(default_proj)
+			print(f"Adding tab to tab_projects: {tab}")
 			self.tab_projects.tabs.append(tab)
 			self.content_projects.append(projtab)
-		tab = flet.Tab(text="+NewProject")
-		self.tab_projects.tabs.append(tab)
-		self.page.add(self.tab_projects)
+			print(f"Created default project: {default_proj.name}")
+			print(f"Tab_projects.tabs length after adding: {len(self.tab_projects.tabs)}")
+		else:
+			for proj in self.solution.projects:
+				projtab, tab = self.__build_project_tab(proj)
+				self.tab_projects.tabs.append(tab)
+				self.content_projects.append(projtab)
+		
+		# Add new project tab
+		print("Creating + New Project tab")
+		new_tab = flet.Tab(
+			text="+ New Project",
+			icon=flet.Icon("add_circle", color=COLORS["success"]),
+			content=flet.Container(
+				content=flet.Column([
+					flet.Icon("add_circle", color=COLORS["success"], size=64),
+					flet.Text("Click to create a new project", 
+						size=18, 
+						color=COLORS["text_secondary"],
+						text_align=flet.TextAlign.CENTER
+					)
+				], 
+				horizontal_alignment=flet.CrossAxisAlignment.CENTER,
+				spacing=20),
+				padding=40,
+				alignment=flet.alignment.center
+			)
+		)
+		print(f"New project tab created: {new_tab}")
+		print(f"New project tab content: {new_tab.content}")
+		self.tab_projects.tabs.append(new_tab)
+		print(f"New project tab added to tab_projects")
+		print(f"Total tabs created: {len(self.tab_projects.tabs)}")
+		print(f"Projects in solution: {len(self.solution.projects)}")
+		
+		# Force select the first tab
+		self.tab_projects.selected_index = 0
+		print(f"✅ Created {len(self.tab_projects.tabs)} tabs, selected index: {self.tab_projects.selected_index}")
+		
+		# Wrap tabs in a card and save as instance variable
+		print(f"Creating tabs_card container with {len(self.tab_projects.tabs)} tabs")
+		self.tabs_card = flet.Container(
+			content=self.tab_projects,
+			padding=20,
+			bgcolor=COLORS["surface"],
+			border_radius=16,
+			border=flet.border.all(1, COLORS["border"]),
+			shadow=flet.BoxShadow(
+				spread_radius=1,
+				blur_radius=15,
+				color=COLORS["background"],
+				offset=flet.Offset(0, 4)
+			),
+			visible=True,
+			height=650
+		)
+		self.page.add(self.tabs_card)
+		
+		# Update UI to ensure tabs are displayed
+		print(f"🔧 Updating UI components...")
+		self.tab_projects.update()
+		self.page.update()
+		
+		# Final verification
+		print(f"✅ Final verification:")
+		print(f"   - Tab projects visible: {self.tab_projects.visible}")
+		print(f"   - Tabs card visible: {self.tabs_card.visible}")
+		print(f"   - Tab projects height: {getattr(self.tab_projects, 'height', 'Not set')}")
+		print(f"   - Tabs card height: {getattr(self.tabs_card, 'height', 'Not set')}")
+		print(f"   - Total tabs: {len(self.tab_projects.tabs)}")
+		print(f"   - Selected index: {self.tab_projects.selected_index}")
+		print(f"✅ Tabs added to page and UI updated!")
 
 	def on_press_save_solution(self, e):
 		if self.solution.path is None:
@@ -642,7 +1028,12 @@ class window:
 
 # ----------------------------------------------------------------------
 def main(page: flet.Page):
-	page.title = "cmakegen"
+	page.title = "CMake Generator"
+	page.theme_mode = flet.ThemeMode.DARK
+	page.window.width = 1400
+	page.window.height = 900
+	page.window.resizable = True
+	page.window.maximizable = True
 	current_window.build(page)
 	page.update()
 
