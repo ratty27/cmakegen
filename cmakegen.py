@@ -211,7 +211,6 @@ class solution:
 		proj = project()
 		proj.name = "Project" + str(len(self.projects)+1)
 		self.add_project(proj)
-		print(f"Created project: {proj.name} with platforms: {proj.platform}")
 		return proj
 
 	def set_path(self, in_path):
@@ -225,7 +224,7 @@ class solution:
 	def save(self):
 		data = to_dict(self)
 		del data['path']
-		#print(data)
+
 		filepath = self.get_savepath()
 		with open(filepath, 'w') as outfile:
 			json.dump(data, outfile)
@@ -468,7 +467,7 @@ class listview_path:
 	def on_path_selected(self, path):
 		base_path = self.owner.get_solution_path()
 		info = path_info(path, base_path)
-		#print(path + ' / ' + base_path )
+
 		info.platform = self.project.platform.copy()
 		self.list_path.append(info)
 		self.update_list(True)
@@ -523,8 +522,6 @@ class project_tab:
 		self.lv_source_files.update_list(True)
 
 	def build(self):
-		print(f"Building project tab content for: {self.project.name}")
-		
 		# Ensure project has valid data
 		if self.project.name is None:
 			self.project.name = "Project1"
@@ -532,10 +529,6 @@ class project_tab:
 			self.project.platform = ["Windows"]
 		if self.project.stdcpp is None:
 			self.project.stdcpp = CXXSTANDARD[0]
-		
-		print(f"   - Project initialized: {self.project.name}")
-		print(f"   - Platforms: {self.project.platform}")
-		print(f"   - C++ standard: {self.project.stdcpp}")
 		
 		# Project Name Panel
 		name_content = flet.TextField(
@@ -660,25 +653,19 @@ class project_tab:
 		)
 
 		# Create expansion panel list with modern styling
-		print(f"Creating ExpansionPanelList with {len([panel_project, panel_platform, panel_cpp])} panels")
-		self.content = flet.ExpansionPanelList(
+		expansion_panels = flet.ExpansionPanelList(
 			controls=[panel_project, panel_platform, panel_cpp],
-			spacing=16,
+			spacing=20,
 			elevation=8,
 			expand_icon_color=COLORS["primary"]
 		)
-		print(f"ExpansionPanelList created: {self.content}")
 		
-		# Debug: Print the content structure
-		print(f"✅ Project tab content built successfully for {self.project.name}")
-		print(f"   - Project name: {self.project.name}")
-		print(f"   - Platforms: {self.project.platform}")
-		print(f"   - C++ standard: {self.project.stdcpp}")
-		print(f"   - Include dirs count: {len(self.project.include_dirs)}")
-		print(f"   - Library dirs count: {len(self.project.library_dirs)}")
-		print(f"   - Sources count: {len(self.project.sources)}")
-		print(f"   - Content type: {type(self.content)}")
-		print(f"   - Content controls count: {len(self.content.controls)}")
+		# Wrap in a scrollable column to enable scrolling within tabs
+		self.content = flet.Column(
+			controls=[expansion_panels],
+			scroll=flet.ScrollMode.AUTO,
+			expand=True
+		)
 
 		return self.content
 
@@ -713,22 +700,14 @@ class window:
 
 	"""Build a project tab"""
 	def __build_project_tab(self, proj):
-		print(f"Building project tab for: {proj.name}")
 		projtab = project_tab(self, proj)
 		content = projtab.build()
-		print(f"Content built successfully for {proj.name}")
-		print(f"   - Content type: {type(content)}")
-		print(f"   - Content has controls: {hasattr(content, 'controls')}")
-		if hasattr(content, 'controls'):
-			print(f"   - Content controls count: {len(content.controls)}")
 		
 		tab = flet.Tab(
 			text=proj.name, 
 			content=content,
 			icon=flet.Icon("folder", color=COLORS["accent"])
 		)
-		print(f"Tab created for {proj.name}: {tab}")
-		print(f"   - Tab content: {tab.content}")
 		return projtab, tab
 
 	"""Result of choose path"""
@@ -781,7 +760,7 @@ class window:
 	"""Build window"""
 	def build(self, in_page):
 		self.page = in_page
-		self.page.scroll = flet.ScrollMode.ALWAYS
+		self.page.scroll = flet.ScrollMode.AUTO
 		self.page.bgcolor = COLORS["background"]
 		self.page.padding = 24
 		self.page.spacing = 20
@@ -930,11 +909,8 @@ class window:
 		if len(self.solution.projects) == 0:
 			default_proj = self.solution.new_project()
 			projtab, tab = self.__build_project_tab(default_proj)
-			print(f"Adding tab to tab_projects: {tab}")
 			self.tab_projects.tabs.append(tab)
 			self.content_projects.append(projtab)
-			print(f"Created default project: {default_proj.name}")
-			print(f"Tab_projects.tabs length after adding: {len(self.tab_projects.tabs)}")
 		else:
 			for proj in self.solution.projects:
 				projtab, tab = self.__build_project_tab(proj)
@@ -942,7 +918,6 @@ class window:
 				self.content_projects.append(projtab)
 		
 		# Add new project tab
-		print("Creating + New Project tab")
 		new_tab = flet.Tab(
 			text="+ New Project",
 			icon=flet.Icon("add_circle", color=COLORS["success"]),
@@ -961,19 +936,12 @@ class window:
 				alignment=flet.alignment.center
 			)
 		)
-		print(f"New project tab created: {new_tab}")
-		print(f"New project tab content: {new_tab.content}")
 		self.tab_projects.tabs.append(new_tab)
-		print(f"New project tab added to tab_projects")
-		print(f"Total tabs created: {len(self.tab_projects.tabs)}")
-		print(f"Projects in solution: {len(self.solution.projects)}")
 		
 		# Force select the first tab
 		self.tab_projects.selected_index = 0
-		print(f"✅ Created {len(self.tab_projects.tabs)} tabs, selected index: {self.tab_projects.selected_index}")
 		
 		# Wrap tabs in a card and save as instance variable
-		print(f"Creating tabs_card container with {len(self.tab_projects.tabs)} tabs")
 		self.tabs_card = flet.Container(
 			content=self.tab_projects,
 			padding=20,
@@ -992,19 +960,8 @@ class window:
 		self.page.add(self.tabs_card)
 		
 		# Update UI to ensure tabs are displayed
-		print(f"🔧 Updating UI components...")
 		self.tab_projects.update()
 		self.page.update()
-		
-		# Final verification
-		print(f"✅ Final verification:")
-		print(f"   - Tab projects visible: {self.tab_projects.visible}")
-		print(f"   - Tabs card visible: {self.tabs_card.visible}")
-		print(f"   - Tab projects height: {getattr(self.tab_projects, 'height', 'Not set')}")
-		print(f"   - Tabs card height: {getattr(self.tabs_card, 'height', 'Not set')}")
-		print(f"   - Total tabs: {len(self.tab_projects.tabs)}")
-		print(f"   - Selected index: {self.tab_projects.selected_index}")
-		print(f"✅ Tabs added to page and UI updated!")
 
 	def on_press_save_solution(self, e):
 		if self.solution.path is None:
@@ -1030,8 +987,8 @@ class window:
 def main(page: flet.Page):
 	page.title = "CMake Generator"
 	page.theme_mode = flet.ThemeMode.DARK
-	page.window.width = 1400
-	page.window.height = 900
+	page.window.width = 1600
+	page.window.height = 1000
 	page.window.resizable = True
 	page.window.maximizable = True
 	current_window.build(page)
